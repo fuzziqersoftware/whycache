@@ -218,6 +218,8 @@ class WhycacheInstance(ABC):
 
     batches = [self._CommitBatch()]
     for key, value_encoded in items:
+      if type(key) is not bytes:
+        raise TypeError(f'key must be bytes; instead it is {type(key)}')
       if key == b'':
         raise ValueError('b\'\' is not a valid whycache key')
 
@@ -284,8 +286,10 @@ class WhycacheInstance(ABC):
 
   def get(self, key: bytes) -> Any:
     """Returns the value for a given key; raises KeyError if it is missing."""
-    # note: we don't call assert_valid() here to maximize performance; it's the
+    # Note: we don't call assert_valid() here to maximize performance; it's the
     # caller's responsibility to call update() first
+    if type(key) is not bytes:
+      raise TypeError(f'key must be bytes; instead it is {type(key)}')
     return self.get_shared_state()[key]
 
   async def set(self, key: bytes, value: Any) -> int:

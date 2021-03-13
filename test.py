@@ -55,6 +55,21 @@ class AssertRaises:
 
 @testcase_file
 @testcase_mysql
+async def test_wrong_types(pc: WhycacheInstance):
+  for key in ('key0', 0, True, None, ()):
+    with AssertRaises(TypeError):
+      pc.get(key)
+    with AssertRaises(TypeError):
+      await pc.set(key, 'value0')
+    with AssertRaises(TypeError):
+      await pc.delete(key)
+    with AssertRaises(TypeError):
+      await pc.set_multi({key: 'value0', b'key1': 'value1'})
+    with AssertRaises(TypeError):
+      await pc.delete_multi([key, b'key1'])
+
+@testcase_file
+@testcase_mysql
 async def test_get_missing_key(pc: WhycacheInstance):
   with AssertRaises(KeyError):
     pc.get(b'missing_key')
