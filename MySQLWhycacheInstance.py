@@ -3,7 +3,7 @@ import collections
 import os
 import re
 
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict, Any, AsyncGenerator
 from WhycacheInstance import WhycacheInstance
 
 
@@ -22,9 +22,15 @@ from WhycacheInstance import WhycacheInstance
 # You may want to use a different BLOB type for the contents field, depending on
 # max_update_size (if you override it from the base class). The abstraction will
 # never attempt to write more than max_update_size bytes to this field.
+# You may also want to use a higher AUTO_INCREMENT value than 1, if you plan on
+# writing a lot of keys using set_multi before the first time you call
+# rewrite_history. (rewrite_history requires some unused id space below the
+# latest update id.)
 
 
 class MySQLWhycacheInstance(WhycacheInstance):
+  read_updates_page_size = 100
+
   MySQLResult = collections.namedtuple(
       'MySQLResult',
       ['rows', 'lastrowid', 'rowcount'])
@@ -99,11 +105,17 @@ class MySQLWhycacheInstance(WhycacheInstance):
   async def get_update_range_contents(self,
     update_id_low: int,
     update_id_high: int,
-  ) -> List[Tuple[int, bytes]]:
-    result = await self._execute_query(
-        f'SELECT id, contents FROM {self.table_name} WHERE id >= %s AND id <= %s',
-        [update_id_low, update_id_high])
-    return [(row['id'], row['contents']) for row in result.rows]
+  ) -> AsyncGenerator[Tuple[int, bytes], None]:
+    # Page through the results in batches of (up to) 100
+    for page_start_id in range(update_id_low, update_id_high + 1, self.read_updates_page_size):
+      page_end_id = page_start_id + self.read_updates_page_size
+      if page_end_id > update_id_high + 1:
+        page_end_id = update_id_high + 1
+      result = await self._execute_query(
+          f'SELECT id, contents FROM {self.table_name} WHERE id >= %s AND id < %s',
+          [page_start_id, page_end_id])
+      for row in result.rows:
+        yield (row['id'], row['contents'])
 
   async def get_latest_update_id(self) -> int:
     row = await self._select_single(

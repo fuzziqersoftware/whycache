@@ -1,7 +1,7 @@
 import os
 import re
 
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, AsyncGenerator
 from WhycacheInstance import WhycacheInstance
 
 
@@ -54,13 +54,11 @@ class FileWhycacheInstance(WhycacheInstance):
       f.write(contents)
 
 
-  async def get_update_range_contents(self, update_id_low: int, update_id_high: int) -> List[Tuple[int, bytes]]:
-    ret = []
+  async def get_update_range_contents(self, update_id_low: int, update_id_high: int) -> AsyncGenerator[Tuple[int, bytes], None]:
     for update_id in range(update_id_low, update_id_high + 1):
       contents = self._read_update(update_id)
       if contents is not None:
-        ret.append((update_id, contents))
-    return ret
+        yield (update_id, contents)
 
   async def get_latest_update_id(self) -> int:
     return self._read_latest_update_id()
